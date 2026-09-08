@@ -1,380 +1,368 @@
-# NeuraVapor
+<div align="center">
 
-**A Closed-Loop, Waste-Heat-to-Water Recovery and Noise-Adaptive Cooling System for Data Centers, with a Live 3D Digital Twin**
+# 💧 NeuraVapor
 
-Engineering Clinics Capstone — Hardware Engineering, 3rd Year
-Budget: ₹6,000–7,000 | Timeline: 10 Weeks
+### Closed-Loop Waste-Heat-to-Water Recovery & Noise-Adaptive Cooling for Data Centers
 
----
+**with a Live 3D Digital Twin**
 
-## Table of Contents
+[![Status](https://img.shields.io/badge/status-active--build-brightgreen?style=for-the-badge)](#-status)
+[![Budget](https://img.shields.io/badge/budget-₹6K--7K-blue?style=for-the-badge)](#-budget)
+[![Timeline](https://img.shields.io/badge/timeline-10%20weeks-orange?style=for-the-badge)](#-timeline)
+[![License](https://img.shields.io/badge/license-TBD-lightgrey?style=for-the-badge)](#-license)
 
-- [Overview](#overview)
-- [The Problem](#the-problem)
-- [System Architecture](#system-architecture)
-- [How It Works](#how-it-works)
-- [Subsystems](#subsystems)
-- [Bill of Materials](#bill-of-materials)
-- [Wiring Reference](#wiring-reference)
-- [Build Guide](#build-guide)
-- [Software Stack](#software-stack)
-- [Budget Breakdown](#budget-breakdown)
-- [Project Timeline](#project-timeline)
-- [Regulatory Context](#regulatory-context)
-- [Repository Structure](#repository-structure)
-- [Status](#status)
-- [License](#license)
+[![Made with Raspberry Pi](https://img.shields.io/badge/hardware-Raspberry%20Pi%20Zero-c51a4a?style=flat-square&logo=raspberrypi&logoColor=white)](#-hardware)
+[![Three.js](https://img.shields.io/badge/visualization-Three.js-000000?style=flat-square&logo=three.js&logoColor=white)](#-digital-twin)
+[![Python](https://img.shields.io/badge/bridge-Python%20%2B%20Flask-3776ab?style=flat-square&logo=python&logoColor=white)](#-software-stack)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-ff69b4?style=flat-square)](#-contributing)
+
+*Turns data center waste heat into recovered water — closed loop, zero external inlet/outlet.*
+
+<sub>Engineering Clinics Capstone · Hardware Engineering, 3rd Year</sub>
 
 ---
 
-## Overview
+</div>
 
-**NeuraVapor** is a low-cost, closed-loop hardware prototype that tackles three failure modes of conventional data center cooling simultaneously:
+## ⚡ TL;DR
 
-| Failure Mode | NeuraVapor's Answer |
-|---|---|
-| **Freshwater depletion** | Membrane distillation recovers water from waste heat instead of evaporating it away |
-| **Acoustic nuisance** | Adaptive control + passive damping minimize pump/fan noise in real time |
-| **Operational opacity** | A live Three.js 3D digital twin visualizes temperature, flow, and noise as they happen |
-
-The system draws heat from a simulated data center load, pushes it through a sealed membrane distillation (MD) chamber, and condenses distilled water on the cold side via a Peltier module — all inside a single recirculating loop with no external water inlet or outlet.
-
-> No external inlet/outlet. This is a closed recirculating system.
-
----
-
-## The Problem
-
-**Freshwater Depletion.** Evaporative cooling consumes 15–50% of a data center's total water intake. In 2026, a $20.5M settlement in Oregon linked groundwater nitrate contamination directly to data center operations — a landmark case signaling escalating environmental liability for operators.
-
-**Noise Pollution.** Pumps, fans, and generators create persistent community nuisance. 2026 saw lawsuits filed in New Jersey, Michigan, and Mississippi, while a Georgia family's well-water complaints are drawing regulatory and congressional attention.
-
-**Regulatory Momentum is accelerating:**
-
-| Jurisdiction | Regulation | Requirement |
-|---|---|---|
-| Germany | EnEfG (July 2026) | Mandates 10% energy reuse for new data centers, rising to 20% by 2028 |
-| Virginia, USA | HB323 | First US law mandating data center waste-heat reuse |
-| Oregon, USA | 2026 Settlement | $20.5M — establishes direct financial liability for water externalities |
-
-NeuraVapor is designed as a feasibility prototype against exactly this regulatory backdrop.
-
----
-
-## System Architecture
-
-The build separates into two physically independent modules connected by a single umbilical cable:
+> Data centers dump 15–50% of their water intake into evaporative cooling. NeuraVapor recovers it instead — using **membrane distillation** to turn waste heat directly into distilled water, in a sealed loop that never touches an external supply. A noise-adaptive control loop keeps pumps and fans quiet, and a **live 3D digital twin** lets you watch temperature, flow, and noise animate in your browser in real time.
 
 ```
-┌─────────────────────────────┐         ┌──────────────────────────────┐
-│   WET BOX (sealed)          │         │   ELECTRONICS TRAY (open)     │
-│                              │  1x PG7 │                                │
-│  • MD Chamber (PTFE)        │  gland, │  • Raspberry Pi Zero          │
-│  • Water Block               │◄──────► │  • 2x L298D motor drivers    │
-│  • Peltier (TEC1-12706)     │ umbilical│ • ADS1115 ADC                │
-│  • Resistor heat bank       │  cable  │                                │
-│  • 12V pump + reservoir     │         │  Handles: control logic,      │
-│  • Cooling fan               │         │  sensor reads, PWM outputs    │
-│  • Distillate collector      │         │                                │
-└─────────────────────────────┘         └──────────────────────────────┘
+   waste heat  →  membrane distillation  →  recovered water
+        └──────────── closed loop, no external I/O ────────────┘
 ```
 
-**Design rationale:** keeping all wet components in one sealed, foam-lined box and all electronics on an open, dry tray means a single point of failure (a leak) can't take out the control hardware, and the tray can be serviced without touching the sealed loop.
+<div align="center">
+
+| 🌡️ Recovers water from heat | 🔇 Adapts to stay quiet | 🖥️ Streams a live 3D twin |
+|:---:|:---:|:---:|
+| PTFE membrane distillation | Sound-sensor-driven PWM control | Three.js + WebSocket dashboard |
+
+</div>
 
 ---
 
-## How It Works
-
-The recirculation loop, closed and continuous:
-
-```
-        ┌─────────────┐
-        │  RESERVOIR   │◄───────────────────┐
-        │ (Buffer Tank)│                     │
-        └──────┬───────┘                     │
-               │                              │
-               ▼                              │
-          ┌─────────┐                         │
-          │  PUMP    │                         │
-          └────┬─────┘                        │
-               │                              │
-               ▼                              │
-      ┌──────────────────┐                    │
-      │   WATER BLOCK      │                    │
-      │   (Heated by       │                    │
-      │   resistor bank)   │                    │
-      └────────┬───────────┘                   │
-               │ Hot Side                       │
-               ▼                                │
-      ┌──────────────────────┐                  │
-      │     MD CHAMBER         │                  │
-      │  (PTFE membrane,       │                  │
-      │   0.45µm pore)         │                  │
-      └──────────┬─────────────┘                 │
-                 │ Cold Side (Peltier-cooled)     │
-                 ▼                                │
-        ┌──────────────────┐                      │
-        │     PELTIER        │                      │
-        │   (TEC1-12706)      │                      │
-        └────────┬─────────┘                       │
-                 │                                 │
-       ┌─────────┴──────────┐                      │
-       ▼                    ▼                      │
-┌─────────────┐    ┌─────────────────┐             │
-│ DISTILLATE   │    │  Cooled water    │─────────────┘
-│  COLLECTOR    │    │  returns to      │
-│  (Output)     │    │  reservoir       │
-└─────────────┘    └─────────────────┘
-```
-
-1. The pump circulates water from the reservoir through the water block.
-2. The resistor bank heats the water block, simulating a data center thermal load.
-3. Hot water flows across the MD chamber's membrane face. Vapor passes through the PTFE membrane while liquid water cannot (hydrophobic membrane distillation).
-4. The Peltier module cools the opposite face of the membrane, causing the vapor to condense.
-5. Condensed distillate drips into the collector cup — this is the recovered water output.
-6. Cooled water on the hot side returns to the reservoir, and the cycle repeats.
-
----
-
-## Subsystems
-
-### 1. Thermal Recovery
-Membrane distillation converts waste heat into recovered water in a closed loop. The MD chamber is built from two acrylic panels bolted around a 25mm PTFE membrane (0.45µm pore size), sealed with silicone.
-
-### 2. Noise Adaptation
-Adaptive control minimizes acoustic noise from pumps, fans, and cooling components. A KY-038 sound sensor feeds real-time acoustic data back into the control loop, which can throttle pump/fan PWM in response. Passive damping (acoustic foam lining, rubber vibration mounts under the pump) handles the baseline noise floor.
-
-### 3. Digital Twin
-A live Three.js 3D dashboard visualizes real-time temperature, flow, and noise metrics, rendering an animated 3D model of the physical rig with live sensor overlays.
-
----
-
-## Bill of Materials
+## 📖 Table of Contents
 
 <details>
-<summary><strong>Wet box structure</strong></summary>
+<summary><b>Click to expand</b></summary>
+
+- [Why This Exists](#-why-this-exists)
+- [How It Works](#-how-it-works)
+- [System Architecture](#️-system-architecture)
+- [Hardware](#-hardware)
+- [Wiring](#-wiring)
+- [Build It Yourself](#️-build-it-yourself)
+- [Software Stack](#-software-stack)
+- [Digital Twin](#-digital-twin)
+- [Budget](#-budget)
+- [Timeline](#-timeline)
+- [Regulatory Landscape](#-regulatory-landscape)
+- [Repo Structure](#-repo-structure)
+- [Status](#-status)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+</details>
+
+---
+
+## 🌍 Why This Exists
+
+<table>
+<tr>
+<td width="33%" valign="top">
+
+### 💧 Water
+Evaporative cooling eats **15–50%** of a data center's water intake. Oregon's 2026 groundwater settlement: **$20.5M**.
+
+</td>
+<td width="33%" valign="top">
+
+### 🔊 Noise
+Community lawsuits over pump/fan/generator noise filed across **3 US states** in 2026 alone.
+
+</td>
+<td width="33%" valign="top">
+
+### 📜 Regulation
+Germany's **EnEfG** mandates 10% heat reuse *now*, 20% by 2028. Virginia's **HB323** is the first US law of its kind.
+
+</td>
+</tr>
+</table>
+
+NeuraVapor is a feasibility prototype aimed squarely at all three, at once, on a ₹6–7K budget.
+
+---
+
+## 🔧 How It Works
+
+<div align="center">
+
+```mermaid
+flowchart LR
+    R[("🪣 Reservoir")] --> P[["⚙️ Pump"]]
+    P --> WB["🔥 Water Block\n(heated)"]
+    WB -->|hot side| MD{{"🧪 MD Chamber\nPTFE 0.45µm"}}
+    MD -->|cold side| PT["❄️ Peltier\nTEC1-12706"]
+    PT --> DC[("💧 Distillate\nCollector")]
+    PT --> R
+    style DC fill:#4fc3f7,stroke:#01579b,color:#000
+    style MD fill:#fff59d,stroke:#f57f17,color:#000
+    style PT fill:#81d4fa,stroke:#01579b,color:#000
+```
+
+</div>
+
+1. 🪣 Pump pulls water from the reservoir
+2. 🔥 Resistor bank heats it at the water block (simulated DC load)
+3. 🧪 Hot water crosses the PTFE membrane — vapor passes, liquid can't
+4. ❄️ Peltier cools the far side, condensing the vapor
+5. 💧 Distillate drips into the collector — **your recovered water**
+6. ♻️ Cooled water loops back to the reservoir. No drain, no tap, ever.
+
+> **Zero external inlet/outlet.** This is a fully closed recirculating system.
+
+---
+
+## 🏗️ System Architecture
+
+Two physically separate modules, one umbilical cable:
+
+<div align="center">
+
+```mermaid
+flowchart TB
+    subgraph WET["🔒 WET BOX — sealed, foam-lined"]
+        direction LR
+        MD2["MD Chamber"] --- WB2["Water Block"] --- PT2["Peltier"] --- PMP["Pump + Reservoir"]
+    end
+    subgraph TRAY["🛠️ ELECTRONICS TRAY — open, dry"]
+        direction LR
+        PI["Pi Zero"] --- L298["2x L298D"] --- ADS["ADS1115"]
+    end
+    WET <-->|"single PG7 gland\numbilical cable"| TRAY
+```
+
+</div>
+
+**Why split it?** A leak in the wet box can never take out the control electronics — and the tray stays fully serviceable without cracking the seal.
+
+---
+
+## 🔩 Hardware
+
+<details>
+<summary><b>🧊 Wet box structure</b></summary>
 
 | Item | Spec |
 |---|---|
 | ABS junction box | 280×190×130mm, clear PC cover |
-| Acrylic sheet | 3mm, 6×6" (4 pcs — 2 working + 2 spare) |
-| PTFE membrane | 0.45µm pore, 25mm diameter (pack of 10) |
-| M3 nut/bolt/washer kit | — |
-| Silicone sealant | Water-safe (e.g. Fevicol Feviseal) |
+| Acrylic sheet | 3mm, 6×6" ×4 (2 working + 2 spare) |
+| PTFE membrane | 0.45µm, 25mm dia |
+| Silicone sealant | Water-safe |
 | Silicone tubing | 6mm ID / 8mm OD |
 | PG7 cable gland | ×1 |
 
 </details>
 
 <details>
-<summary><strong>Cooling / heat assembly</strong></summary>
+<summary><b>🌡️ Cooling / heat assembly</b></summary>
 
 | Item | Spec |
 |---|---|
 | Aluminum water block | 40×40mm |
-| Aluminum heat sink | 40×40×20mm + thermal paste |
+| Aluminum heat sink | 40×40×20mm |
 | Peltier module | TEC1-12706 |
 | Cooling fan | 12V, 4010 |
 | Resistor heat bank | — |
-| Submersible water pump | 12V DC |
-| Vibration pad | For pump isolation |
+| Submersible pump | 12V DC |
 
 </details>
 
 <details>
-<summary><strong>Sensors</strong></summary>
+<summary><b>📡 Sensors</b></summary>
+
+| Sensor | Qty |
+|---|:---:|
+| DS18B20 waterproof temp probe | 2 |
+| Water flow sensor | 1 |
+| Sound sensor (KY-038) | 1 |
+| Water level sensor | 1 |
+
+</details>
+
+<details>
+<summary><b>🖥️ Electronics tray</b></summary>
 
 | Item | Qty |
-|---|---|
-| DS18B20 waterproof temp probe | ×2 |
-| Water flow sensor | ×1 |
-| Sound sensor module (KY-038) | ×1 |
-| Water level sensor | ×1 |
+|---|:---:|
+| Raspberry Pi Zero | 1 |
+| L298D motor driver | 2 |
+| ADS1115 ADC | 1 |
+| 4.7kΩ pull-up (DS18B20) | 1 |
+| 1kΩ+2kΩ divider (flow sensor) | 1 |
+
+</details>
+
+> ℹ️ **Deck vs. build guide:** the original proposal spec'd an Arduino Uno + Python/Flask serial bridge. The as-built rig moved to a **Pi Zero** running control directly — treat the wiring below as the source of truth.
+
+---
+
+## ⚡ Wiring
+
+<details open>
+<summary><b>Motor drivers (2× L298D)</b></summary>
+
+Each channel: `IN1→3.3V (HIGH)` · `IN2→GND (LOW)` · `EN→GPIO (PWM)`
+
+| Load | GPIO | Pin |
+|---|:---:|:---:|
+| 💧 Pump | GPIO18 | 12 |
+| ❄️ Peltier | GPIO13 | 33 |
+| 🔥 Resistor bank | GPIO12 | 32 |
+| 🌀 Fan | GPIO19 | 35 |
 
 </details>
 
 <details>
-<summary><strong>Electronics (tray side)</strong></summary>
+<summary><b>DS18B20 ×2 (1-Wire)</b></summary>
 
-| Item | Qty / Spec |
-|---|---|
-| Raspberry Pi Zero | ×1 |
-| L298D motor driver | ×2 |
-| ADS1115 ADC module | ×1 |
-| Pull-up resistor (DS18B20) | 4.7kΩ |
-| Voltage divider (flow sensor, if 5V) | 1kΩ + 2kΩ |
-| Female-to-female jumper wires | — |
-| Breadboard | For bench testing |
+`Red→3.3V` · `Black→GND` · `Yellow→GPIO4 (Pin 7)` + 4.7kΩ pull-up to 3.3V
 
 </details>
 
 <details>
-<summary><strong>Power & misc.</strong></summary>
+<summary><b>ADS1115</b></summary>
 
-| Item | Notes |
-|---|---|
-| Pi 5V adapter | Or USB power bank for untethered runs |
-| 12V wall adapter | Or 12V battery pack |
-| Acoustic foam panels | + spray adhesive (not silicone) |
-| Heat shrink tubing | Optional |
-| Distilled water | For initial fill/testing |
+`VDD→3.3V` · `GND→GND` · `SCL→GPIO3 (Pin 5)` · `SDA→GPIO2 (Pin 3)` · `A0→Sound` · `A1→Water level`
 
 </details>
 
-> **Note on the project proposal deck:** the original capstone submission specifies an **Arduino Uno**–based control board with a Python (`pyserial` + Flask) serial bridge feeding the Three.js dashboard over WebSocket. The build guide above reflects the **as-built** electronics, which moved to a **Raspberry Pi Zero** running the control loop directly. If you're following this repo end-to-end, treat the Pi Zero wiring as authoritative.
-
 ---
 
-## Wiring Reference
+## 🛠️ Build It Yourself
 
-### Shared Ground
-Pi GND, 12V supply GND, and both L298D driver GNDs join on one common rail.
+```
+✅ 1. Parts checklist        confirm everything before starting
+✅ 2. MD chamber              acrylic + membrane, star-bolt, 24h cure
+✅ 3. Cooling assembly         heat sink → water block → Peltier polarity check
+✅ 4. Electronics tray         Pi + drivers + ADS1115 on a rigid base
+✅ 5. Umbilical cable          single PG7 gland, quick-disconnect terminal
+✅ 6. Wiring                   breadboard first, then permanent
+✅ 7. Bench test               i2cdetect -y 1 → expect `48`
+✅ 8. Leak test                15+ min, fully dry
+✅ 9. Final assembly           foam, vibration pad, gland seal
+✅ 10. Power-on checklist      full pre-flight before first live run
+```
 
-### Motor Drivers (2× L298D)
+<details>
+<summary><b>🚦 Full power-on checklist</b></summary>
 
-Each channel: `IN1 → 3.3V (HIGH)`, `IN2 → GND (LOW)`, `EN → GPIO (PWM control)`
-
-| Load | GPIO (BCM) | Physical Pin |
-|---|---|---|
-| Water pump | GPIO18 | Pin 12 |
-| Peltier | GPIO13 | Pin 33 |
-| Resistor bank | GPIO12 | Pin 32 |
-| Cooling fan | GPIO19 | Pin 35 |
-
-### DS18B20 ×2 (1-Wire, shared bus)
-
-| Wire | Connection |
-|---|---|
-| Red | Pi 3.3V |
-| Black | Pi GND |
-| Yellow | GPIO4 (Pin 7) + 4.7kΩ pull-up to 3.3V |
-
-### Water Flow Sensor
-
-| Wire | Connection |
-|---|---|
-| Red (VCC) | 5V |
-| Black | Pi GND |
-| Yellow (Signal) | GPIO17 (Pin 11), via 1kΩ+2kΩ divider if 5V output |
-
-### ADS1115
-
-| Pin | Connection |
-|---|---|
-| VDD/VREF | Pi 3.3V |
-| GND | Pi GND |
-| SCL | GPIO3 (Pin 5) |
-| SDA | GPIO2 (Pin 3) |
-| A0 | Sound sensor analog out |
-| A1 | Water level sensor analog out |
-
----
-
-## Build Guide
-
-The full build proceeds in 10 stages — each bench-tested before moving to the next:
-
-1. **Parts checklist** — confirm every component before starting
-2. **Build the MD chamber** — sandwich PTFE membrane between acrylic panels, star-pattern bolt tightening, 24hr sealant cure
-3. **Build the cooling assembly** — heat sink, water block, Peltier polarity check *before* final mounting
-4. **Build the electronics tray** — mount Pi + drivers + ADS1115 on a rigid open base
-5. **Wire the umbilical cable** — single PG7 gland, quick-disconnect terminal block for tray/box separation
-6. **Electronics wiring** — breadboard first, then transfer to permanent connections
-7. **Bench test** — `i2cdetect -y 1` (expect `48`), check `/sys/bus/w1/devices/` for two `28-xxxxxxxxxxxx` entries
-8. **Leak test** — 15+ minutes minimum, fully dry before proceeding
-9. **Final wet box assembly** — foam lining, vibration pad, gland seal, multimeter short-check
-10. **Power-on checklist** — full pre-flight before first live run
-
-**Full power-on checklist:**
-
-- [ ] DS18B20 ×2 confirmed wired and reading
-- [ ] Multimeter: no short between 12V and GND on either driver
+- [ ] DS18B20 ×2 wired and reading
+- [ ] No short between 12V and GND on either driver
 - [ ] Peltier polarity re-confirmed after final mounting
-- [ ] All GND wires joined at one common point
+- [ ] All GND joined at one common point
 - [ ] Pull-up resistor on DS18B20 data line
-- [ ] Voltage divider on flow sensor signal line (if 5V)
-- [ ] ADS1115 wired and detected via `i2cdetect`
-- [ ] Cooling loop leak-tested 15+ min, fully dry
-- [ ] Umbilical cable connector seated firmly, gland tightened
-- [ ] Electronics tray secured (nothing sliding, ports accessible)
-- [ ] Nothing electrical sits in a splash zone
+- [ ] Voltage divider on flow sensor (if 5V)
+- [ ] ADS1115 detected via `i2cdetect`
+- [ ] Loop leak-tested 15+ min, fully dry
+- [ ] Umbilical connector seated, gland tightened
+- [ ] Tray secured, ports accessible
+- [ ] Nothing electrical in a splash zone
+
+</details>
 
 ---
 
-## Software Stack
+## 💻 Software Stack
 
-The digital twin layer is fully open-source (₹0 contribution to budget):
-
-| Component | Stack | Role |
+| Layer | Stack | Job |
 |---|---|---|
-| **Python Serial Bridge** | `pyserial` + Flask | Reads sensor data over USB serial, exposes it as a WebSocket stream |
-| **Digital Twin Dashboard** | Three.js + WebSocket | Renders a live 3D model with animated water flow, temperature gradients, and noise indicators |
-| **Firmware / Control Loop** | C/C++ (Arduino IDE) *or Python (Pi)* | Adaptive control — adjusts pump speed and Peltier power based on temperature/noise feedback |
-| **Sensor Libraries** | OneWire (DS18B20), Flask, Three.js, WebSocket | All open-source, no licensing cost, fully reproducible |
+| 🔌 Serial Bridge | `pyserial` + Flask | Sensor data → WebSocket stream |
+| 🌐 Digital Twin | Three.js + WebSocket | Live animated 3D rig |
+| 🧠 Control Loop | Python (Pi) / C++ (Arduino) | Adaptive pump + Peltier PWM |
+| 📦 Libraries | OneWire, Flask, Three.js, WebSocket | 100% open-source, ₹0 cost |
 
-**Live data streams:** 2× temperature channels + 1× acoustic noise channel, streamed to the dashboard in real time.
-
----
-
-## Budget Breakdown
-
-| Category | Estimated Cost (₹) |
-|---|---|
-| Brain & sensing (controller, sensors) | 1,230 |
-| Heat source (resistors, MOSFETs, heatsink) | 480 |
-| Cooling loop (pump, tubing, water block) | 870 |
-| MD chamber (acrylic/polycarbonate, membrane, Peltier) | 1,250 |
-| Cold side (heatsink, fan) | 430 |
-| Acoustic treatment & enclosure (foam, mounts, box) | 1,180 |
-| Power & safety (adapter, fuse, wiring) | 440 |
-| Measurement (cylinder, misc.) | 100 |
-| **Hardware Total** | **≈ ₹5,980–6,900** |
-| Digital twin software | ₹0 (open-source) |
-| **Grand Total** | **≈ ₹6,000–7,000** |
-
-**Cost optimizations applied:** single pump instead of dual, lab-borrowed instruments (multimeter) where available.
+**Live streams:** 2× temperature · 1× acoustic noise → dashboard, in real time.
 
 ---
 
-## Project Timeline
+## 🌐 Digital Twin
 
-10-week single-semester build, tracked week by week:
+> 🎬 *Drop a GIF or screen recording of the dashboard here once it's live.*
 
-| Week | Phase | Key Deliverable |
+```
+┌────────────────────────────────────────┐
+│   🌡️ Hot Side: 62°C   ❄️ Cold Side: 18°C  │
+│   💧 Flow: 0.4 L/min   🔊 Noise: 41 dB     │
+│   [========== animated 3D rig ==========]  │
+└────────────────────────────────────────┘
+```
+
+Real-time WebSocket feed → Three.js scene → animated water flow, temperature gradients, and noise-level indicators rendered live in the browser.
+
+---
+
+## 💰 Budget
+
+<div align="center">
+
+| Category | ₹ |
+|---|---:|
+| 🧠 Brain & sensing | 1,230 |
+| 🔥 Heat source | 480 |
+| 💧 Cooling loop | 870 |
+| 🧪 MD chamber | 1,250 |
+| ❄️ Cold side | 430 |
+| 🔇 Acoustic + enclosure | 1,180 |
+| ⚡ Power & safety | 440 |
+| 📏 Measurement | 100 |
+| **Hardware total** | **≈ 5,980–6,900** |
+| 💻 Software | **0** (open-source) |
+| **Grand total** | **≈ ₹6,000–7,000** |
+
+</div>
+
+---
+
+## 📅 Timeline
+
+<div align="center">
+
+`Week 1` 🛒 → `Week 2-3` 💧 → `Week 3-4` 🧪 → `Week 4-5` 📡 → `Week 5-7` 🧠🌐 → `Week 7` 🔇 → `Week 8` 🔗 → `Week 9` 📊 → `Week 10` 📄
+
+</div>
+
+| Week | Deliverable |
+|:---:|---|
+| 1 | Controller configured, serial comms tested |
+| 2 | Adjustable heat load via PWM |
+| 2–3 | Leak-free closed loop |
+| 3–4 | Sealed MD chamber + Peltier installed |
+| 4–5 | Calibrated temp + noise sensors |
+| 5–6 | Adaptive control loop live |
+| 6–7 | 3D dashboard end-to-end |
+| 7 | Enclosure + acoustic treatment |
+| 8 | Full system integration |
+| 9 | Performance data collected |
+| 10 | Final report + demo |
+
+---
+
+## 📜 Regulatory Landscape
+
+| 🌍 | Regulation | Requirement |
 |---|---|---|
-| 1 | Procurement & setup | Controller configured, serial comms tested |
-| 2 | Heat source build | Working adjustable heat load via PWM |
-| 2–3 | Liquid cooling loop | Leak-free closed loop with pump circulation |
-| 3–4 | MD chamber construction | Sealed chamber with Peltier installed |
-| 4–5 | Sensor integration | Calibrated temperature and noise sensors |
-| 5–6 | Control software | Adaptive control loop working, structured serial output |
-| 6–7 | Digital twin dashboard | Live 3D dashboard end-to-end |
-| 7 | Enclosure & acoustic treatment | Assembled enclosure with foam and isolators |
-| 8 | Full system integration | End-to-end working prototype, all subsystems live |
-| 9 | Data collection | Water recovery, noise, and thermal efficiency data |
-| 10 | Documentation & demo prep | Final report + rehearsed live demo |
-
-**Milestone grouping:**
-- **Weeks 1–4:** Hardware foundation (heat source, cooling loop, MD chamber)
-- **Weeks 4–7:** Software & integration (sensors, control logic, digital twin)
-- **Weeks 7–8:** Enclosure & acoustic treatment
-- **Weeks 8–10:** Validation & delivery
+| 🇩🇪 Germany | EnEfG (Jul 2026) | 10% heat reuse now → 20% by 2028 |
+| 🇺🇸 Virginia | HB323 | First US mandatory heat-reuse law |
+| 🇺🇸 Oregon | 2026 Settlement | $20.5M — water externalities now cost money |
 
 ---
 
-## Regulatory Context
-
-NeuraVapor is explicitly positioned as a feasibility prototype against real, active regulation — not a hypothetical use case:
-
-- **EnEfG (Germany, July 2026):** mandates 10% waste-heat reuse for new data centers, rising to 20% by 2028.
-- **HB323 (Virginia, USA):** the first US law requiring data center waste-heat reuse.
-- **Oregon 2026 settlement:** $20.5M paid out over groundwater nitrate contamination linked to data center operations — establishing that water externalities now carry direct financial risk for operators.
-
----
-
-## Repository Structure
-
-*(suggested — adapt to your actual repo layout)*
+## 📁 Repo Structure
 
 ```
 neuravapor/
@@ -386,8 +374,8 @@ neuravapor/
 ├── firmware/
 │   └── control-loop/
 ├── software/
-│   ├── serial-bridge/        # pyserial + Flask
-│   └── digital-twin/         # Three.js dashboard
+│   ├── serial-bridge/       # pyserial + Flask
+│   └── digital-twin/        # Three.js dashboard
 ├── hardware/
 │   ├── bom.csv
 │   ├── wiring-diagram.png
@@ -398,12 +386,32 @@ neuravapor/
 
 ---
 
-## Status
+## 🚦 Status
 
-🔧 **Active build** — hardware assembly in progress. Wet box design finalized; electronics tray wiring and bench testing underway per the build guide above.
+<div align="center">
+
+![Build](https://img.shields.io/badge/hardware-wet%20box%20finalized-success?style=flat-square)
+![Build](https://img.shields.io/badge/electronics-wiring%20%26%20bench%20test-yellow?style=flat-square)
+![Build](https://img.shields.io/badge/digital%20twin-not%20started-lightgrey?style=flat-square)
+
+</div>
 
 ---
 
-## License
+## 🤝 Contributing
 
-*Add your chosen license here (e.g. MIT for code, CERN-OHL for hardware designs).*
+Issues and PRs welcome — especially around control-loop tuning, membrane sourcing, and dashboard visuals.
+
+---
+
+## 📄 License
+
+*Add your chosen license — MIT for code, CERN-OHL for hardware designs.*
+
+<div align="center">
+
+---
+
+**NeuraVapor** · Built to prove waste heat doesn't have to be waste.
+
+</div>
