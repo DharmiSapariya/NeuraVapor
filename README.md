@@ -320,7 +320,7 @@ Issues and pull requests are welcome, particularly around control-loop tuning, m
 
 ## License
 
-To be decided. The intended split is MIT for code and CERN-OHL for hardware designs.
+MIT
 
 ---
 
